@@ -12,5 +12,4 @@ pizza_t* pizzaiolo_montar_pizza(pedido_t* pedido);
 void pizzaiolo_colocar_forno(pizza_t* pizza);
 void pizzaiolo_retirar_forno(pizza_t* pizza);
 
-
 #endif /*__HELPER_H_*/

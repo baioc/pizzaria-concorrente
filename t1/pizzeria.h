@@ -7,33 +7,33 @@
 typedef struct cliente_s cliente_t;
 
 typedef struct pedido_s {
-    cliente_t* cliente; ///< IMPORTANTE! NÃO REMOVER
-    int id;             ///< IMPORTANTE! NÃO REMOVER
-    int sabor;          ///< IMPORTANTE! NÃO REMOVER
+    cliente_t* cliente;
+    int id;
+    int sabor;
 
-    /* você pode adicionar coisas aqui */
+    //
 } pedido_t;
 
 typedef struct pizza_s {
-    int sabor;          ///< IMPORTANTE! NÃO REMOVER
-    int fatias;         ///< IMPORTANTE! NÃO REMOVER
-    pedido_t* pedido;   ///< IMPORTANTE! NÃO REMOVER
-    struct timespec ts; ///< IMPORTANTE! NÃO REMOVER
+    int sabor;
+    int fatias;
+    pedido_t* pedido;
+    struct timespec ts;
 
-    /* você pode adicionar coisas aqui */
+    //
 } pizza_t;
 
 void pizzeria_init(int tam_forno, int n_pizzaiolos, int n_mesas,
                    int n_garcons, int tam_deck, int n_grupos);
 
-void pizzeria_close();
-void pizzeria_destroy();
+void pizzeria_close(void);
+void pizzeria_destroy(void);
 
 void pizza_assada(pizza_t* pizza);
 int  pegar_mesas(int tam_grupo);
 
 void garcom_tchau(int tam_grupo);
-void garcom_chamar();
+void garcom_chamar(void);
 void fazer_pedido(pedido_t* pedido);
 
 int pizza_pegar_fatia(pizza_t* pizza);
