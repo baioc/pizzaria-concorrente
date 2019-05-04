@@ -348,8 +348,8 @@ static int client_gen_leader(client_gen_t* gen) {
     sim_sleep(40); //pagamento
     jabuti_sum(&g_hlp_mesas, -ceil(size/4.0));
     hlp_info("INFO: Líder se despedindo após pedido %d\n", pedido->id);
-    garcom_tchau(size);
     jabuti_sum(&g_hlp_garcons, -1);
+    garcom_tchau(size);
     stats_add_msecs(&g_hlp_tempo_visita, &ts);
     sem_destroy(&cli.goiaba);
 
