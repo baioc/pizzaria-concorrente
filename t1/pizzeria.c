@@ -10,14 +10,13 @@
 
 
 static void* cozinhar(void* arg);
-static void* atender(void* arg);
+static void* entregar(void* arg);
 
 static const int TAM_MESA = 4;
 
 static bool pizzaria_fechada;
 
 static sem_t balcao_espaco;
-static sem_t balcao_ocupado;
 static pizza_t* balcao_pizza;
 
 static pthread_mutex_t pa;
@@ -28,16 +27,15 @@ static pthread_mutex_t mesas;
 static int mesas_livres;
 static int mesas_total;
 
+static sem_t garcons;
+static pthread_attr_t independente;
+
 static queue_t deck;
 
 static sem_t grupos_concorrentes;
 
 static pthread_t* pizzaiolos;
 static int pizzaiolos_size;
-
-static pthread_t* garcons;
-static int garcons_size;
-static sem_t garcons_desocupados;
 
 
 // INFRAESTRUTURA
@@ -54,7 +52,6 @@ void pizzeria_init(int tam_forno, int n_pizzaiolos, int n_mesas,
 	pizzaria_fechada = false;
 
 	sem_init(&balcao_espaco, false, 1);
-	sem_init(&balcao_ocupado, false, 0);
 
 	pthread_mutex_init(&pa, NULL);
 
@@ -63,6 +60,10 @@ void pizzeria_init(int tam_forno, int n_pizzaiolos, int n_mesas,
 	mesas_total = n_mesas;
 	mesas_livres = n_mesas;
 	pthread_mutex_init(&mesas, NULL);
+
+	sem_init(&garcons, false, n_garcons);
+	pthread_attr_init(&independente);
+	pthread_attr_setdetachstate(&independente, PTHREAD_CREATE_DETACHED);
 
 	queue_init(&deck, tam_deck);
 
@@ -73,13 +74,6 @@ void pizzeria_init(int tam_forno, int n_pizzaiolos, int n_mesas,
 	pizzaiolos_size = n_pizzaiolos;
 	for (int i = 0; i < pizzaiolos_size; ++i)
 		pthread_create(&pizzaiolos[i], NULL, cozinhar, NULL);
-
-	sem_init(&garcons_desocupados, false, n_garcons);
-	garcons = malloc(sizeof(pthread_t) * n_garcons);
-	assert(garcons != NULL);
-	garcons_size = n_garcons;
-	for (int i = 0; i < garcons_size; ++i)
-		pthread_create(&garcons[i], NULL, atender, NULL);
 }
 
 static bool pizzaria_vazia(void) {
@@ -96,27 +90,20 @@ void pizzeria_close(void) {
 	// espera os clientes sairem
 	while(!pizzaria_vazia());
 
-	// @TODO: saida dos funcionarios
-
-	// // espera os garcons sairem
-	// for (int i = 0; i < garcons_size; ++i)
-	// 	pthread_join(garcons[i], NULL);
-
-	// // espera os pizzaiolos sairem
+	// @TODO: espera os pizzaiolos sairem
 	// for (int i = 0; i < pizzaiolos_size; ++i)
 	// 	pthread_join(pizzaiolos[i], NULL);
 }
 
 void pizzeria_destroy(void) {
-	free(garcons);
-
 	free(pizzaiolos);
-
-	sem_destroy(&garcons_desocupados);
 
 	sem_destroy(&grupos_concorrentes);
 
 	queue_destroy(&deck);
+
+	pthread_attr_destroy(&independente);
+	sem_destroy(&garcons);
 
 	pthread_mutex_destroy(&mesas);
 
@@ -125,7 +112,6 @@ void pizzeria_destroy(void) {
 	pthread_mutex_destroy(&pa);
 
 	sem_destroy(&balcao_espaco);
-	sem_destroy(&balcao_ocupado);
 }
 
 
@@ -152,7 +138,7 @@ static void* cozinhar(void* arg) {
 
 		// espera espaco no balcao
 		sem_wait(&balcao_espaco);
-		// usa a pa para tirar a pizza do forno (liberando espaco) e botar no balcao
+		// usa a pa para tirar a pizza do forno (liberando espaco)
 		pthread_mutex_lock(&pa);
 		pizzaiolo_retirar_forno(pizza);
 		sem_post(&forno_espacos);
@@ -163,10 +149,29 @@ static void* cozinhar(void* arg) {
 
 		// coloca um pegador junto a pizza no balcao
 		balcao_pizza = pizza;
-		// @FIXME: esse mutex nunca eh destruido
+		// @FIXME: esse mutex nunca eh des-inicializado
 		pthread_mutex_init(&(balcao_pizza->pegador), NULL);
-		sem_post(&balcao_ocupado);
+		// avisa a equipe de garcons
+		pthread_t garcons_equipe;
+		pthread_create(&garcons_equipe, &independente, entregar, NULL);
 	}
+	return NULL;
+}
+
+// Chamada a equipe de garcons para entregar um pedido.
+static void* entregar(void* arg) {
+	// espera ate que um garcom esteja livre
+	sem_wait(&garcons);
+
+	// pega a pizza e libera espaco do balcao
+	pizza_t* pizza = balcao_pizza;
+	sem_post(&balcao_espaco);
+
+	// entrega a pizza
+	garcom_entregar(pizza);
+
+	// desocupa este garcom
+	sem_post(&garcons);
 	return NULL;
 }
 
@@ -175,32 +180,15 @@ void pizza_assada(pizza_t* pizza) {
 	sem_post(&(pizza->pronta));
 }
 
-// Comportamento de cada um dos garcons.
-static void* atender(void* arg) {
-	while (true) {
-		// espera ate que um garcom esteja livre
-		sem_wait(&garcons_desocupados);
-
-		// confere se tem que levar algum pedido do balcao para mesas
-		if (!sem_trywait(&balcao_ocupado)) {
-			// entrega a pizza e libera espaco do balcao
-			garcom_entregar(balcao_pizza);
-			sem_post(&balcao_espaco);
-		}
-
-		// libera garcom
-		sem_post(&garcons_desocupados);
-	}
-	return NULL;
-}
-
 
 // CLIENTES
 
 int pegar_mesas(int tam_grupo) {
-	sem_wait(&grupos_concorrentes); // limita o numero de grupos tentando sentar
+	// limita o numero de grupos tentando sentar
+	sem_wait(&grupos_concorrentes);
+
+	// enquanto o grupo nao estiver sentado
 	int mesas_necessarias = tam_grupo / TAM_MESA + (tam_grupo % TAM_MESA != 0);
-	// enquanto nao estiverem sentados
 	while (mesas_necessarias > 0) {
 		// se a pizzaria estiver aberta
 		if (!pizzaria_fechada) {
@@ -217,7 +205,8 @@ int pegar_mesas(int tam_grupo) {
 			return -1;
 		}
 	}
-	// libera a entrada um grupo futuro
+
+	// libera a entrada de um futuro grupo
 	sem_post(&grupos_concorrentes);
 	return 0;
 }
@@ -245,14 +234,14 @@ int pizza_pegar_fatia(pizza_t* pizza) {
 
 void garcom_chamar(void) {
 	// chama um garcom para a mesa
-	sem_wait(&garcons_desocupados);
+	sem_wait(&garcons);
 }
 
 void garcom_tchau(int tam_grupo) {
-	// libera o garcom que chamou
-	sem_post(&garcons_desocupados);
+	// depois de pagar, libera o garcom que chamou
+	sem_post(&garcons);
 
-	// desocupam as mesas em que estavam
+	// desocupa as mesas em que o grupo estava
 	const int mesas_ocupadas = tam_grupo / TAM_MESA + (tam_grupo % TAM_MESA != 0);
 	pthread_mutex_lock(&mesas);
 	mesas_livres += mesas_ocupadas;
