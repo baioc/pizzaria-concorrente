@@ -2,6 +2,7 @@
 #define __PIZZERIA_H_
 
 #include <pthread.h>
+#include <semaphore.h>
 
 #include "queue.h"
 
@@ -21,7 +22,8 @@ typedef struct pizza_s {
     pedido_t* pedido;
     struct timespec ts;
 	//
-	pthread_mutex_t* pegador;
+	sem_t pronta;
+	pthread_mutex_t pegador;
 } pizza_t;
 
 
