@@ -30,6 +30,8 @@ static int mesas_total;
 
 static queue_t deck;
 
+static sem_t grupos_concorrentes;
+
 static pthread_t* pizzaiolos;
 static int pizzaiolos_size;
 
@@ -64,7 +66,7 @@ void pizzeria_init(int tam_forno, int n_pizzaiolos, int n_mesas,
 
 	queue_init(&deck, tam_deck);
 
-	// @NOTE: n_grupos nao utilizado
+	sem_init(&grupos_concorrentes, false, n_grupos);
 
 	pizzaiolos = malloc(sizeof(pthread_t) * n_pizzaiolos);
 	assert(pizzaiolos != NULL);
@@ -110,9 +112,11 @@ void pizzeria_destroy(void) {
 
 	free(pizzaiolos);
 
-	queue_destroy(&deck);
-
 	sem_destroy(&garcons_desocupados);
+
+	sem_destroy(&grupos_concorrentes);
+
+	queue_destroy(&deck);
 
 	pthread_mutex_destroy(&mesas);
 
@@ -194,6 +198,7 @@ static void* atender(void* arg) {
 // CLIENTES
 
 int pegar_mesas(int tam_grupo) {
+	sem_wait(&grupos_concorrentes); // limita o numero de grupos tentando sentar
 	int mesas_necessarias = tam_grupo / TAM_MESA + (tam_grupo % TAM_MESA != 0);
 	// enquanto nao estiverem sentados
 	while (mesas_necessarias > 0) {
@@ -208,9 +213,12 @@ int pegar_mesas(int tam_grupo) {
 			pthread_mutex_unlock(&mesas);
 		} else {
 			// pizaria fechada -> desistem
+			sem_post(&grupos_concorrentes);
 			return -1;
 		}
 	}
+	// libera a entrada um grupo futuro
+	sem_post(&grupos_concorrentes);
 	return 0;
 }
 
