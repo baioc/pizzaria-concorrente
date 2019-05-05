@@ -7,13 +7,18 @@
 
 
 int main(int argc, char** argv) {
-    int tam_forno = 1, n_pizzaiolos = 1, n_mesas = 10, n_garcons = 1,
-    tam_deck = 0, n_grupos = 0, segs_execucao = 10;
+	int tam_forno = 1;
+	int n_pizzaiolos = 1;
+	int n_mesas = 10;
+	int n_garcons = 1;
+    int tam_deck = 0;
+	int n_grupos = 0;
+	int segs_execucao = 10;
 
     if (argc < 7) {
         printf("Faltaram argumentos!\n"
-               "Uso: %s tam_forno n_pizzaiolos n_mesas n_garcons "
-               "tam_deck n_grupos [segs_execucao]\n", argv[0]);
+		       "Uso: %s tam_forno n_pizzaiolos n_mesas n_garcons "
+			   "tam_deck n_grupos [segs_execucao]\n", argv[0]);
         return 1;
     }
 

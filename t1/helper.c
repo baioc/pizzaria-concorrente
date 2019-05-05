@@ -297,12 +297,12 @@ static int client_gen_leader(client_gen_t* gen) {
         return 0;
     } else {
 	jabuti_sum(&g_hlp_mesas, ceil(size/4.0));
-	if (gen->goh) {
-	    for (int i = 0; i < 2; ++i) sched_yield();
-	    jabuti_sum(&g_hlp_mesas, -ceil(size/4.0));
-	    garcom_tchau(size);
-	    return 1;
-	}
+		if (gen->goh) {
+			for (int i = 0; i < 2; ++i) sched_yield();
+			jabuti_sum(&g_hlp_mesas, -ceil(size/4.0));
+			garcom_tchau(size);
+			return 1;
+		}
     }
 
     struct timespec ts2 = stats_gettime();
@@ -392,4 +392,3 @@ void client_gen_shutdown(client_gen_t* gen) {
     for (int i = 0; i < gen->n_leaders; ++i)
         pthread_join(gen->leaders[i], NULL);
 }
-

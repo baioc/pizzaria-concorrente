@@ -8,10 +8,8 @@
 
 void queue_init(queue_t* q, size_t capacity) {
     memset(q, 0, sizeof(queue_t));
-
     q->capacity = capacity;
     q->buf = calloc(capacity, sizeof(void*));
-
     int err;
     err = pthread_mutex_init(&q->mtx, NULL); assert(!err);
     err = sem_init(&q->full, 0, 0);          assert(!err);
@@ -20,15 +18,13 @@ void queue_init(queue_t* q, size_t capacity) {
 
 void queue_destroy(queue_t* q) {
     assert(q->buf);
-
     pthread_mutex_lock(&q->mtx);
-    free(q->buf); // @NOTE: nao libera as coisas da fila, so o buffer
+    free(q->buf);
     q->buf = NULL;
-    // @NOTE: porque setar valores em algo destruido ?
+    // pq setar valores em algo destruido?
     q->size = 0;
     q->begin = q->end = 0;
     pthread_mutex_unlock(&q->mtx);
-
     sem_destroy(&q->empty);
     sem_destroy(&q->full);
     pthread_mutex_destroy(&q->mtx);
@@ -36,7 +32,6 @@ void queue_destroy(queue_t* q) {
 
 void queue_push_back(queue_t* q, void* val) {
     assert(q->buf);
-
     sem_wait(&q->empty);
     pthread_mutex_lock(&q->mtx);
     q->buf[q->end] = val;
@@ -49,7 +44,6 @@ void queue_push_back(queue_t* q, void* val) {
 
 void* queue_wait(queue_t* q) {
     assert(q->buf);
-
     sem_wait(&q->full);
     pthread_mutex_lock(&q->mtx);
     assert(q->size != 0);
@@ -59,13 +53,12 @@ void* queue_wait(queue_t* q) {
     q->size--;
     sem_post(&q->empty);
     pthread_mutex_unlock(&q->mtx);
-
     return front;
 }
 
 int queue_empty(queue_t* q) {
     pthread_mutex_lock(&q->mtx);
-    int empty = q->size == 0;
+    int empty = q->size <= 0;
     pthread_mutex_unlock(&q->mtx);
     return empty;
 }

@@ -14,9 +14,16 @@ typedef struct {
 } queue_t;
 
 extern void  queue_init(queue_t* q, size_t capacity);
+
+// Nao deleta as coisas contidas na fila, apenas o buffer interno.
 extern void  queue_destroy(queue_t* q);
+
 extern void  queue_push_back(queue_t* q, void* val);
-extern void* queue_wait(queue_t* q); // queue_wait <=> queue_pop_back
+
+// Equivale a queue_pop_front()
+extern void* queue_wait(queue_t* q);
+
 extern int   queue_empty(queue_t* q);
+
 
 #endif /*__QUEUE_H__*/
