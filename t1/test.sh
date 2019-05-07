@@ -6,6 +6,10 @@ function exemplo() {
 	INE5410_INFO=$1 ./program 2 2 40 3 8 40 10
 }
 
+function inferno() {
+	INE5410_GOH=1 exemplo $1
+}
+
 function mini_forno() {
 	INE5410_INFO=$1 ./program 2 10 40 40 40 40
 }
