@@ -24,6 +24,7 @@ static pthread_mutex_t g_pa;
 static sem_t g_forno_espacos;
 
 static pthread_mutex_t g_mesas;
+static pthread_cond_t g_mesas_alguem_saiu;
 static int g_mesas_livres;
 static int g_mesas_total;
 
@@ -51,6 +52,7 @@ void pizzeria_init(int tam_forno, int n_pizzaiolos, int n_mesas,
 	g_mesas_total = n_mesas;
 	g_mesas_livres = n_mesas;
 	pthread_mutex_init(&g_mesas, NULL);
+	pthread_cond_init(&g_mesas_alguem_saiu, NULL);
 
 	sem_init(&g_garcons, false, n_garcons);
 	pthread_attr_init(&g_pedido_independente);
@@ -67,19 +69,15 @@ void pizzeria_init(int tam_forno, int n_pizzaiolos, int n_mesas,
 		pthread_create(&g_pizzaiolos[i], NULL, cozinhar, NULL);
 }
 
-static bool pizzaria_vazia(void) {
-	pthread_mutex_lock(&g_mesas);
-	const int livres = g_mesas_livres;
-	pthread_mutex_unlock(&g_mesas);
-	return livres >= g_mesas_total;
-}
-
 void pizzeria_close(void) {
 	// fecha a entrada
 	g_pizzaria_fechada = true;
 
 	// espera os clientes sairem
-	while(!pizzaria_vazia());
+	pthread_mutex_lock(&g_mesas);
+	while (g_mesas_livres < g_mesas_total)
+		pthread_cond_wait(&g_mesas_alguem_saiu, &g_mesas);
+	pthread_mutex_unlock(&g_mesas);
 
 	// libera os pizzaiolos
 	for (int i = 0; i < g_pizzaiolos_size; ++i)
@@ -96,6 +94,7 @@ void pizzeria_destroy(void) {
 	pthread_attr_destroy(&g_pedido_independente);
 	sem_destroy(&g_garcons);
 
+	pthread_cond_destroy(&g_mesas_alguem_saiu);
 	pthread_mutex_destroy(&g_mesas);
 
 	sem_destroy(&g_forno_espacos);
@@ -176,24 +175,24 @@ void pizza_assada(pizza_t* pizza) {
 // CLIENTES
 
 int pegar_mesas(int tam_grupo) {
-	// enquanto o grupo nao estiver sentado
-	int mesas_necessarias = tam_grupo / TAM_MESA + (tam_grupo % TAM_MESA != 0);
-	while (mesas_necessarias > 0) {
-		// se a pizzaria estiver aberta
-		if (!g_pizzaria_fechada) {
-			// tenta sentar ocupando as mesas necessarias
-			pthread_mutex_lock(&g_mesas);
-			if (mesas_necessarias <= g_mesas_livres) {
-				g_mesas_livres -= mesas_necessarias;
-				mesas_necessarias = 0;
-			}
-			pthread_mutex_unlock(&g_mesas);
-		} else {
-			// pizaria fechada -> desistem
-			return -1;
-		}
+	// espera ate conseguir sentar todos do grupo
+	const int mesas_necessarias = tam_grupo / TAM_MESA + (tam_grupo % TAM_MESA != 0);
+	pthread_mutex_lock(&g_mesas);
+	while (mesas_necessarias > g_mesas_livres) {
+		// so confere denovo quando alguem sair
+		pthread_cond_wait(&g_mesas_alguem_saiu, &g_mesas);
 	}
-	return 0;
+
+	// grupo se senta se a pizzaria ainda estiver aberta
+	if (!g_pizzaria_fechada) {
+		g_mesas_livres -= mesas_necessarias;
+		pthread_mutex_unlock(&g_mesas);
+		return 0;
+	} else {
+		// pizaria fechada -> desistem
+		pthread_mutex_unlock(&g_mesas);
+		return -1;
+	}
 }
 
 void fazer_pedido(pedido_t* pedido) {
@@ -231,4 +230,5 @@ void garcom_tchau(int tam_grupo) {
 	pthread_mutex_lock(&g_mesas);
 	g_mesas_livres += mesas_ocupadas;
 	pthread_mutex_unlock(&g_mesas);
+	pthread_cond_broadcast(&g_mesas_alguem_saiu);
 }
