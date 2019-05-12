@@ -41,6 +41,14 @@ static int g_pizzaiolos_size;
 
 void pizzeria_init(int tam_forno, int n_pizzaiolos, int n_mesas,
                    int n_garcons, int tam_deck, int n_grupos) {
+	assert(tam_forno > 0);
+	assert(n_pizzaiolos > 0);
+	assert(n_mesas > 0);
+	assert(n_garcons > 0);
+	assert(tam_deck > 0);
+	// assert(n_grupos > 0);
+	// @NOTE: n_grupos nao utilizado
+
 	g_pizzaria_fechada = false;
 
 	sem_init(&g_balcao_espaco, false, 1);
@@ -59,8 +67,6 @@ void pizzeria_init(int tam_forno, int n_pizzaiolos, int n_mesas,
 	pthread_attr_setdetachstate(&g_pedido_independente, PTHREAD_CREATE_DETACHED);
 
 	queue_init(&g_deck, tam_deck);
-
-	// @NOTE: n_grupos nao utilizado
 
 	g_pizzaiolos = malloc(sizeof(pthread_t) * n_pizzaiolos);
 	assert(g_pizzaiolos != NULL);
@@ -134,8 +140,8 @@ static void* cozinhar(void* arg) {
 		// usa a pa para tirar a pizza do forno (liberando espaco)
 		pthread_mutex_lock(&g_pa);
 		pizzaiolo_retirar_forno(pizza);
-		sem_post(&g_forno_espacos);
 		pthread_mutex_unlock(&g_pa);
+		sem_post(&g_forno_espacos);
 
 		// finalizando o preparo
 		sem_destroy(&(pizza->pronta));
@@ -175,6 +181,11 @@ void pizza_assada(pizza_t* pizza) {
 // CLIENTES
 
 int pegar_mesas(int tam_grupo) {
+	// estamos sempre fechados para um grupo de tamanho invalido
+	assert(tam_grupo > 0);
+	if (tam_grupo > g_mesas_total)
+		return -1;
+
 	// espera ate conseguir sentar todos do grupo
 	const int mesas_necessarias = tam_grupo / TAM_MESA + (tam_grupo % TAM_MESA != 0);
 	pthread_mutex_lock(&g_mesas);
